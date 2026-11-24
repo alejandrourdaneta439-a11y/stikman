@@ -1,0 +1,8 @@
+{
+  "name": "Refugio Cero: Stickman Nuclear",
+  "description": "Juego de supervivencia nuclear para 2 jugadores en celular con personajes stickman de distintas clases.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

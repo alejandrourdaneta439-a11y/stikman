@@ -11,9 +11,14 @@ interface CraftingPanelProps {
 }
 
 export function CraftingPanel({ hud, onCraft, onClose }: CraftingPanelProps) {
-  const hasHumanP2 = hud.p2.enabled && !hud.p2.isBot;
+  const hasHumanP2 = !hud.isOnline && hud.p2.enabled && !hud.p2.isBot;
   const [targetPlayer, setTargetPlayer] = useState<1 | 2>(1);
-  const resolvedTarget: 1 | 2 = hasHumanP2 ? targetPlayer : 1;
+  const resolvedTarget: 1 | 2 =
+    hud.isOnline && hud.localPlayerId
+      ? hud.localPlayerId
+      : hasHumanP2
+      ? targetPlayer
+      : 1;
   const activePlayer = resolvedTarget === 1 ? hud.p1 : hud.p2;
 
   return (

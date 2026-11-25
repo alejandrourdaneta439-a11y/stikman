@@ -2,7 +2,10 @@ import { HudSnapshot, PlayerCount } from '../game/types';
 
 interface PauseModalProps {
   playerCount: PlayerCount;
+  isOnline?: boolean;
   onSwitchPlayerCount: (count: PlayerCount) => void;
+  onOpenSettings: () => void;
+  onOpenMusic: () => void;
   onResume: () => void;
   onRestart: () => void;
   onChangeChars: () => void;
@@ -11,7 +14,10 @@ interface PauseModalProps {
 
 export function PauseModal({
   playerCount,
+  isOnline = false,
   onSwitchPlayerCount,
+  onOpenSettings,
+  onOpenMusic,
   onResume,
   onRestart,
   onChangeChars,
@@ -21,39 +27,43 @@ export function PauseModal({
     <div className="fixed inset-0 z-40 bg-black/75 flex items-center justify-center p-4">
       <div className="w-full max-w-sm bg-[#14191d] border border-white/15 rounded-xl p-6 space-y-4 text-center">
         <h2 className="font-display text-3xl font-bold text-slate-100 tracking-wide">
-          PAUSA
+          {isOnline ? 'MENÚ ONLINE' : 'PAUSA'}
         </h2>
         <p className="text-xs text-slate-400">
-          {playerCount === 1
-            ? 'J1 (A D W · F G) · Crafteo (C)'
-            : 'J1 (A D W · F G) · J2 (◀ ▶ ▲ · K L) · Crafteo (C)'}
+          {isOnline
+            ? 'Juega con A D W · F G o controles táctiles · Craft (C) · Armas (B)'
+            : playerCount === 1
+            ? 'J1 (A D W · F G) · Craft (C) · Armas (B)'
+            : 'J1 (A D W · F G) · J2 (◀ ▶ ▲ · K L) · Craft (C) · Armas (B)'}
         </p>
 
-        {/* Switch 1P <-> 2P */}
-        <div className="grid grid-cols-2 gap-1 p-1 rounded-lg bg-[#0b0e11] border border-white/10">
-          <button
-            type="button"
-            onClick={() => onSwitchPlayerCount(1)}
-            className={`min-h-[38px] rounded-md text-xs font-semibold cursor-pointer transition-colors ${
-              playerCount === 1
-                ? 'bg-sky-400 text-slate-950'
-                : 'text-slate-300 hover:text-white'
-            }`}
-          >
-            1 Jugador
-          </button>
-          <button
-            type="button"
-            onClick={() => onSwitchPlayerCount(2)}
-            className={`min-h-[38px] rounded-md text-xs font-semibold cursor-pointer transition-colors ${
-              playerCount === 2
-                ? 'bg-sky-400 text-slate-950'
-                : 'text-slate-300 hover:text-white'
-            }`}
-          >
-            2 Jugadores
-          </button>
-        </div>
+        {/* Switch 1P <-> 2P in local games */}
+        {!isOnline && (
+          <div className="grid grid-cols-2 gap-1 p-1 rounded-lg bg-[#0b0e11] border border-white/10">
+            <button
+              type="button"
+              onClick={() => onSwitchPlayerCount(1)}
+              className={`min-h-[38px] rounded-md text-xs font-semibold cursor-pointer transition-colors ${
+                playerCount === 1
+                  ? 'bg-sky-400 text-slate-950'
+                  : 'text-slate-300 hover:text-white'
+              }`}
+            >
+              1 Jugador
+            </button>
+            <button
+              type="button"
+              onClick={() => onSwitchPlayerCount(2)}
+              className={`min-h-[38px] rounded-md text-xs font-semibold cursor-pointer transition-colors ${
+                playerCount === 2
+                  ? 'bg-sky-400 text-slate-950'
+                  : 'text-slate-300 hover:text-white'
+              }`}
+            >
+              2 Jugadores
+            </button>
+          </div>
+        )}
 
         <div className="flex flex-col gap-2.5 pt-1">
           <button
@@ -61,28 +71,51 @@ export function PauseModal({
             onClick={onResume}
             className="min-h-[46px] w-full rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-display text-lg font-bold tracking-wide cursor-pointer"
           >
-            Reanudar
+            {isOnline ? 'Volver al Duelo' : 'Reanudar'}
           </button>
-          <button
-            type="button"
-            onClick={onRestart}
-            className="min-h-[44px] w-full rounded-lg bg-[#1e262d] hover:bg-[#2a343d] text-slate-100 text-sm font-semibold cursor-pointer"
-          >
-            Reiniciar Partida
-          </button>
-          <button
-            type="button"
-            onClick={onChangeChars}
-            className="min-h-[44px] w-full rounded-lg bg-[#1e262d] hover:bg-[#2a343d] text-slate-100 text-sm font-semibold cursor-pointer"
-          >
-            Cambiar Personajes
-          </button>
+
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={onOpenMusic}
+              className="min-h-[42px] rounded-lg bg-[#1e262d] hover:bg-[#2a343d] text-amber-300 text-xs font-semibold cursor-pointer"
+            >
+              Música Celular
+            </button>
+            <button
+              type="button"
+              onClick={onOpenSettings}
+              className="min-h-[42px] rounded-lg bg-[#1e262d] hover:bg-[#2a343d] text-slate-100 text-xs font-semibold cursor-pointer"
+            >
+              Configuración
+            </button>
+          </div>
+
+          {!isOnline && (
+            <>
+              <button
+                type="button"
+                onClick={onRestart}
+                className="min-h-[44px] w-full rounded-lg bg-[#1e262d] hover:bg-[#2a343d] text-slate-100 text-sm font-semibold cursor-pointer"
+              >
+                Reiniciar Partida
+              </button>
+              <button
+                type="button"
+                onClick={onChangeChars}
+                className="min-h-[44px] w-full rounded-lg bg-[#1e262d] hover:bg-[#2a343d] text-slate-100 text-sm font-semibold cursor-pointer"
+              >
+                Cambiar Personajes
+              </button>
+            </>
+          )}
+
           <button
             type="button"
             onClick={onMainMenu}
             className="min-h-[44px] w-full rounded-lg bg-transparent border border-white/10 hover:bg-white/5 text-slate-300 text-sm font-medium cursor-pointer"
           >
-            Menú Principal
+            {isOnline ? 'Salir de la Sala' : 'Menú Principal'}
           </button>
         </div>
       </div>
@@ -121,7 +154,9 @@ export function GameOverModal({
       <div className="w-full max-w-md bg-[#14191d] border border-amber-500/35 rounded-xl p-6 space-y-5">
         <div className="text-center space-y-1">
           <p className="text-xs font-mono-num text-amber-400">
-            {hud.mode === 'COOP'
+            {hud.isOnline
+              ? 'DUELO PVP ONLINE FINALIZADO'
+              : hud.mode === 'COOP'
               ? `OLEADA ALCANZADA ${hud.wave} · ${hud.teamScore} PTS`
               : 'DUELO FINALIZADO'}
           </p>
@@ -164,43 +199,50 @@ export function GameOverModal({
             style={{ borderColor: '#0e32dc' }}
             className="min-h-[48px] w-full rounded-lg border-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-display text-lg font-bold tracking-wide cursor-pointer"
           >
-            Jugar de Nuevo
+            {hud.isOnline ? 'Revancha Online' : 'Jugar de Nuevo'}
           </button>
 
-          {/* Switch 1P <-> 2P directly from Game Over */}
-          <div className="grid grid-cols-2 gap-1 p-1 rounded-lg bg-[#0b0e11] border border-white/10">
-            <button
-              type="button"
-              onClick={() => onSwitchPlayerCount(1)}
-              className={`min-h-[38px] rounded-md text-xs font-semibold cursor-pointer transition-colors ${
-                hud.playerCount === 1
-                  ? 'bg-sky-400 text-slate-950'
-                  : 'text-slate-300 hover:text-white'
-              }`}
-            >
-              1 Jugador
-            </button>
-            <button
-              type="button"
-              onClick={() => onSwitchPlayerCount(2)}
-              className={`min-h-[38px] rounded-md text-xs font-semibold cursor-pointer transition-colors ${
-                hud.playerCount === 2
-                  ? 'bg-sky-400 text-slate-950'
-                  : 'text-slate-300 hover:text-white'
-              }`}
-            >
-              2 Jugadores
-            </button>
-          </div>
+          {!hud.isOnline && (
+            <div className="grid grid-cols-2 gap-1 p-1 rounded-lg bg-[#0b0e11] border border-white/10">
+              <button
+                type="button"
+                onClick={() => onSwitchPlayerCount(1)}
+                className={`min-h-[38px] rounded-md text-xs font-semibold cursor-pointer transition-colors ${
+                  hud.playerCount === 1
+                    ? 'bg-sky-400 text-slate-950'
+                    : 'text-slate-300 hover:text-white'
+                }`}
+              >
+                1 Jugador
+              </button>
+              <button
+                type="button"
+                onClick={() => onSwitchPlayerCount(2)}
+                className={`min-h-[38px] rounded-md text-xs font-semibold cursor-pointer transition-colors ${
+                  hud.playerCount === 2
+                    ? 'bg-sky-400 text-slate-950'
+                    : 'text-slate-300 hover:text-white'
+                }`}
+              >
+                2 Jugadores
+              </button>
+            </div>
+          )}
 
-          <div className="grid grid-cols-2 gap-2.5">
-            <button
-              type="button"
-              onClick={onChangeChars}
-              className="min-h-[44px] rounded-lg bg-[#1e262d] hover:bg-[#2a343d] text-slate-100 text-xs sm:text-sm font-semibold cursor-pointer"
-            >
-              Cambiar Clases
-            </button>
+          <div
+            className={`grid gap-2.5 ${
+              hud.isOnline ? 'grid-cols-1' : 'grid-cols-2'
+            }`}
+          >
+            {!hud.isOnline && (
+              <button
+                type="button"
+                onClick={onChangeChars}
+                className="min-h-[44px] rounded-lg bg-[#1e262d] hover:bg-[#2a343d] text-slate-100 text-xs sm:text-sm font-semibold cursor-pointer"
+              >
+                Cambiar Clases
+              </button>
+            )}
             <button
               type="button"
               onClick={onMainMenu}

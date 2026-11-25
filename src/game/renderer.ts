@@ -424,7 +424,7 @@ function drawStickman(
     ctx.strokeStyle = '#f59e0b';
     ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.arc(0, -34, 16, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (p.downedTimer / 15));
+    ctx.arc(0, -34, 16, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (p.downedTimer / 22));
     ctx.stroke();
 
     if (p.reviveProgress > 0) {
@@ -470,63 +470,161 @@ function drawStickman(
   ctx.lineTo(0, -47);
   ctx.stroke();
 
-  // Class Backpack / Armor Details
+  // Class Backpack / Anime Capelet & Armor Details
   if (p.classId === 'medic') {
+    ctx.fillStyle = '#059669';
+    ctx.beginPath();
+    ctx.moveTo(-2, -47);
+    ctx.lineTo(-14, -27);
+    ctx.lineTo(-3, -29);
+    ctx.closePath();
+    ctx.fill();
     ctx.fillStyle = '#10b981';
-    ctx.fillRect(-10, -46, 7, 15);
+    ctx.fillRect(-10, -46, 7, 14);
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(-8, -41, 3, 6);
   } else if (p.classId === 'engineer') {
     ctx.fillStyle = '#d97706';
-    ctx.fillRect(-9, -45, 7, 14);
+    ctx.fillRect(-9, -46, 8, 15);
+    ctx.fillStyle = '#fbbf24';
+    ctx.fillRect(-7, -44, 12, 5);
+  } else if (p.classId === 'scout') {
+    ctx.fillStyle = '#1e1b4b';
+    ctx.fillRect(-6, -47, 12, 16);
   } else if (p.classId === 'juggernaut') {
-    ctx.fillStyle = '#64748b';
-    ctx.fillRect(-9, -48, 18, 14);
+    ctx.fillStyle = '#475569';
+    ctx.fillRect(-10, -49, 20, 16);
+    ctx.fillStyle = '#38bdf8';
+    ctx.fillRect(-11, -49, 6, 6);
+    ctx.fillRect(5, -49, 6, 6);
   }
 
   // Head
   ctx.fillStyle = bodyColor;
   ctx.beginPath();
-  ctx.arc(0, -56, 9, 0, Math.PI * 2);
+  ctx.arc(0, -56, 9.5, 0, Math.PI * 2);
   ctx.fill();
 
-  // Class Headgear
+  // Anime Hair + Class Headgear + Expressive Anime Eyes
   if (p.classId === 'medic') {
+    // Flowing emerald anime hair & ponytail
     ctx.fillStyle = '#10b981';
-    ctx.fillRect(-8, -60, 16, 4);
+    ctx.beginPath();
+    ctx.arc(-1, -58, 10, Math.PI * 0.85, Math.PI * 2.05);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(-8, -56);
+    ctx.lineTo(-17, -47 + armBob * 0.5);
+    ctx.lineTo(-11, -43 + armBob * 0.5);
+    ctx.closePath();
+    ctx.fill();
+    // Anime eye
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(2, -57.5, 5, 4);
     ctx.fillStyle = '#34d399';
-    ctx.fillRect(2, -57, 7, 4);
+    ctx.fillRect(3.5, -56.5, 3, 2.5);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(5, -57, 1.5, 1.5);
   } else if (p.classId === 'engineer') {
-    // Yellow safety helmet
+    // Spiky amber anime bangs + tactical helmet
     ctx.fillStyle = '#f59e0b';
     ctx.beginPath();
-    ctx.arc(0, -58, 10, Math.PI, 0);
+    ctx.arc(0, -59, 10, Math.PI, 0);
     ctx.fill();
-    ctx.fillRect(-11, -59, 22, 3);
+    ctx.fillRect(-11, -60, 22, 3);
+    ctx.fillStyle = '#b45309';
+    ctx.beginPath();
+    ctx.moveTo(2, -58);
+    ctx.lineTo(10, -55);
+    ctx.lineTo(5, -53);
+    ctx.closePath();
+    ctx.fill();
+    // Anime eye + goggle glint
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(2, -56, 5.5, 3.8);
+    ctx.fillStyle = '#fbbf24';
+    ctx.fillRect(4, -55, 2.5, 2);
   } else if (p.classId === 'scout') {
-    // Twin NVG goggles
+    // Spiky violet anime hair + ninja face mask + glowing anime eye
+    ctx.fillStyle = '#9333ea';
+    ctx.beginPath();
+    ctx.moveTo(-10, -58);
+    ctx.lineTo(-14, -67);
+    ctx.lineTo(-4, -63);
+    ctx.lineTo(1, -69);
+    ctx.lineTo(6, -63);
+    ctx.lineTo(12, -62);
+    ctx.lineTo(8, -56);
+    ctx.closePath();
+    ctx.fill();
+    // Mask lower face
     ctx.fillStyle = '#1e293b';
-    ctx.fillRect(1, -59, 9, 5);
+    ctx.fillRect(-3, -54, 11, 6);
+    // Sharp anime eye
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(2, -58, 6, 3.5);
     ctx.fillStyle = '#d8b4fe';
-    ctx.fillRect(4, -58, 4, 3);
+    ctx.fillRect(4, -57, 3, 2);
   } else if (p.classId === 'juggernaut') {
-    // Heavy welding visor
+    // Stoic silver anime hair tuft + open-visor tactical helm
     ctx.fillStyle = '#334155';
-    ctx.fillRect(-9, -64, 18, 13);
+    ctx.fillRect(-10, -64, 20, 11);
+    ctx.fillStyle = '#cbd5e1';
+    ctx.beginPath();
+    ctx.moveTo(4, -64);
+    ctx.lineTo(12, -67);
+    ctx.lineTo(8, -59);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(1, -58, 7, 4);
     ctx.fillStyle = '#38bdf8';
-    ctx.fillRect(1, -58, 7, 3);
+    ctx.fillRect(3, -57, 4, 2.2);
   }
 
   // Player indicator headband dot
   ctx.fillStyle = playerTagColor;
-  ctx.fillRect(-9, -67, 18, 2.5);
+  ctx.fillRect(-9, -68, 18, 2.5);
 
   // Arms & Weapon
   const recoil = p.attackAnimTimer > 0 ? -4 : 0;
   ctx.strokeStyle = bodyColor;
   ctx.lineWidth = p.classId === 'juggernaut' ? 4.5 : 3.5;
 
-  if (p.classId === 'juggernaut') {
+  if (p.equippedWeapon !== 'default') {
+    ctx.beginPath();
+    ctx.moveTo(0, -43);
+    ctx.lineTo(14 + recoil, -38 + armBob);
+    ctx.stroke();
+
+    if (p.equippedWeapon === 'shotgun') {
+      ctx.fillStyle = '#334155';
+      ctx.fillRect(8 + recoil, -42 + armBob, 24, 6);
+      ctx.fillStyle = '#f97316';
+      ctx.fillRect(15 + recoil, -38 + armBob, 10, 3);
+    } else if (p.equippedWeapon === 'smg') {
+      ctx.fillStyle = '#475569';
+      ctx.fillRect(10 + recoil, -42 + armBob, 18, 5);
+      ctx.fillStyle = '#fbbf24';
+      ctx.fillRect(16 + recoil, -37 + armBob, 4, 8);
+    } else if (p.equippedWeapon === 'flamethrower') {
+      ctx.fillStyle = '#b91c1c';
+      ctx.fillRect(8 + recoil, -43 + armBob, 24, 7);
+      ctx.fillStyle = '#fb923c';
+      ctx.fillRect(30 + recoil, -42 + armBob, 5, 5);
+    } else if (p.equippedWeapon === 'launcher') {
+      ctx.fillStyle = '#365314';
+      ctx.fillRect(8 + recoil, -44 + armBob, 23, 9);
+      ctx.fillStyle = '#84cc16';
+      ctx.fillRect(15 + recoil, -43 + armBob, 8, 7);
+    } else {
+      // laser_cannon
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(8 + recoil, -43 + armBob, 27, 7);
+      ctx.fillStyle = '#22d3ee';
+      ctx.fillRect(24 + recoil, -42 + armBob, 11, 4);
+    }
+  } else if (p.classId === 'juggernaut') {
     const swingAngle = p.attackAnimTimer > 0 ? 1.25 : -0.55;
     ctx.save();
     ctx.translate(4, -42);
@@ -570,13 +668,14 @@ function drawStickman(
 
   ctx.restore();
 
-  // Player Label (J1 / J2) + Pickaxe badge
+  // Player Label (J1 / J2 + Custom Name) + Pickaxe badge
   ctx.save();
   ctx.translate(p.x, p.y);
   ctx.fillStyle = playerTagColor;
   ctx.font = '700 11px JetBrains Mono, monospace';
   ctx.textAlign = 'center';
-  const tagText = p.isBot ? 'BOT' : `J${p.id}`;
+  const baseTag = p.isBot ? 'BOT' : `J${p.id}`;
+  const tagText = p.customName ? `${baseTag} · ${p.customName.slice(0, 12)}` : baseTag;
   ctx.fillText(p.hasPickaxe ? `${tagText} ⛏` : tagText, 0, -76);
 
   // Active Emote / Signal Speech Bubble
@@ -703,12 +802,13 @@ function drawEnemy(
 export function renderWorld(
   ctx: CanvasRenderingContext2D,
   world: SimulationWorld,
-  timeSec: number
+  timeSec: number,
+  allowShake = true
 ): void {
   ctx.save();
 
   // Camera Shake
-  if (world.shakeIntensity > 0.2) {
+  if (allowShake && world.shakeIntensity > 0.2) {
     const sx = (Math.random() - 0.5) * world.shakeIntensity * 1.4;
     const sy = (Math.random() - 0.5) * world.shakeIntensity * 1.4;
     ctx.translate(sx, sy);
@@ -851,10 +951,21 @@ export function renderWorld(
       ctx.stroke();
       ctx.globalAlpha = 1;
     }
-    ctx.fillStyle = pr.color;
-    ctx.beginPath();
-    ctx.arc(pr.x, pr.y, pr.radius, 0, Math.PI * 2);
-    ctx.fill();
+    if (pr.kind === 'grenade') {
+      ctx.fillStyle = '#1e293b';
+      ctx.beginPath();
+      ctx.arc(pr.x, pr.y, pr.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#84cc16';
+      ctx.beginPath();
+      ctx.arc(pr.x, pr.y, pr.radius * 0.55, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.fillStyle = pr.color;
+      ctx.beginPath();
+      ctx.arc(pr.x, pr.y, pr.radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   // Particles & Shockwave Rings

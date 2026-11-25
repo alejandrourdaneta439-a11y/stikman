@@ -1,4 +1,4 @@
-import { CharacterClassId } from '../game/types';
+import type { CharacterClassId, WeaponId } from '../game/types.ts';
 
 class SoundEngine {
   private ctx: AudioContext | null = null;
@@ -52,10 +52,88 @@ class SoundEngine {
     osc.stop(now + 0.11);
   }
 
-  public playShoot(classId: CharacterClassId): void {
+  public playShoot(
+    classId: CharacterClassId,
+    weaponId: WeaponId = 'default'
+  ): void {
     const ctx = this.ensureContext();
     if (!ctx) return;
     const now = ctx.currentTime;
+
+    if (weaponId === 'shotgun') {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(240, now);
+      osc.frequency.exponentialRampToValueAtTime(55, now + 0.14);
+      gain.gain.setValueAtTime(0.15, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.16);
+      return;
+    }
+
+    if (weaponId === 'smg') {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(480, now);
+      osc.frequency.exponentialRampToValueAtTime(140, now + 0.05);
+      gain.gain.setValueAtTime(0.075, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.055);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.06);
+      return;
+    }
+
+    if (weaponId === 'flamethrower') {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(135 + Math.random() * 45, now);
+      osc.frequency.exponentialRampToValueAtTime(70, now + 0.08);
+      gain.gain.setValueAtTime(0.06, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.085);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.09);
+      return;
+    }
+
+    if (weaponId === 'launcher') {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(210, now);
+      osc.frequency.exponentialRampToValueAtTime(62, now + 0.16);
+      gain.gain.setValueAtTime(0.16, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.19);
+      return;
+    }
+
+    if (weaponId === 'laser_cannon') {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(1040, now);
+      osc.frequency.exponentialRampToValueAtTime(180, now + 0.2);
+      gain.gain.setValueAtTime(0.14, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.23);
+      return;
+    }
 
     if (classId === 'juggernaut') {
       // Heavy seismic hammer whoosh/thud

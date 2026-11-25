@@ -1,6 +1,7 @@
 export type GameState =
   | 'TITLE_MENU'
   | 'CHARACTER_SELECT'
+  | 'ONLINE_LOBBY'
   | 'PLAYING'
   | 'PAUSED'
   | 'GAME_OVER';
@@ -56,6 +57,25 @@ export interface CraftRecipe {
   shortLabel: string;
   desc: string;
   cost: ResourceBag;
+}
+
+export type WeaponId =
+  | 'default'
+  | 'shotgun'
+  | 'smg'
+  | 'flamethrower'
+  | 'launcher'
+  | 'laser_cannon';
+
+export interface WeaponDef {
+  id: WeaponId;
+  name: string;
+  shortLabel: string;
+  desc: string;
+  costCredits: number;
+  damageLabel: string;
+  rateLabel: string;
+  color: string;
 }
 
 export type EmoteId = 'help' | 'gather' | 'danger' | 'build' | 'ok';
@@ -119,6 +139,7 @@ export interface BuiltStructure {
 export interface PlayerState {
   id: 1 | 2;
   classId: CharacterClassId;
+  customName: string;
   x: number;
   y: number;
   vx: number;
@@ -145,6 +166,9 @@ export interface PlayerState {
   maxSpecialCooldown: number;
 
   hasPickaxe: boolean;
+  credits: number;
+  ownedWeapons: WeaponId[];
+  equippedWeapon: WeaponId;
   activeEmote: EmoteDef | null;
   emoteTimer: number;
 
@@ -291,6 +315,7 @@ export interface PlayerHudInfo {
   id: 1 | 2;
   classId: CharacterClassId;
   name: string;
+  className: string;
   enabled: boolean;
   isBot: boolean;
   hp: number;
@@ -299,6 +324,9 @@ export interface PlayerHudInfo {
   specialReadyRatio: number;
   specialCooldownSec: number;
   hasPickaxe: boolean;
+  credits: number;
+  ownedWeapons: WeaponId[];
+  equippedWeapon: WeaponId;
   downed: boolean;
   dead: boolean;
   shieldActive: boolean;
@@ -309,9 +337,20 @@ export interface PlayerHudInfo {
   score: number;
 }
 
+export type EventLogCategory = 'weather' | 'resource' | 'combat' | 'craft';
+
+export interface EventLogEntry {
+  id: number;
+  text: string;
+  category: EventLogCategory;
+  timestampSec: number;
+}
+
 export interface HudSnapshot {
   mode: GameMode;
   playerCount: PlayerCount;
+  isOnline?: boolean;
+  localPlayerId?: 1 | 2;
   wave: number;
   enemiesRemaining: number;
   teamScore: number;
@@ -320,7 +359,41 @@ export interface HudSnapshot {
   nextWeather: WeatherType;
   weatherTimerSec: number;
   weatherWarning: boolean;
+  eventLog: EventLogEntry[];
   winnerId: 1 | 2 | 'coop' | 'draw' | null;
   p1: PlayerHudInfo;
   p2: PlayerHudInfo;
 }
+
+export interface OnlineRoomPlayer {
+  slot: 1 | 2;
+  name: string;
+  classId: CharacterClassId;
+  ready: boolean;
+}
+
+export type ClientWsMessage =
+  | { type: 'create_room'; name: string; classId: CharacterClassId }
+  | { type: 'join_room'; code: string; name: string; classId: CharacterClassId }
+  | { type: 'quick_match'; name: string; classId: CharacterClassId }
+  | { type: 'update_profile'; name: string; classId: CharacterClassId }
+  | { type: 'start_match' }
+  | { type: 'input'; input: PlayerInput }
+  | { type: 'craft'; itemId: CraftItemId }
+  | { type: 'buy_weapon'; weaponId: WeaponId }
+  | { type: 'emote'; emoteId: EmoteId }
+  | { type: 'rematch' }
+  | { type: 'leave_room' };
+
+export type ServerWsMessage =
+  | {
+      type: 'room_joined';
+      code: string;
+      slot: 1 | 2;
+      players: OnlineRoomPlayer[];
+    }
+  | { type: 'room_updated'; players: OnlineRoomPlayer[] }
+  | { type: 'match_started'; world: unknown }
+  | { type: 'state'; world: unknown }
+  | { type: 'opponent_left'; message: string }
+  | { type: 'error'; message: string };

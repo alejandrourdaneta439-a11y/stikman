@@ -1,16 +1,25 @@
 import {
+  AlertTriangle,
   CloudLightning,
   CloudRain,
+  Crosshair,
+  Globe,
   Hammer,
+  Music,
+  Package,
   Pause,
+  Radio,
+  Settings,
   Smartphone,
   Sun,
   Users,
   Volume2,
   VolumeX,
   Wind,
+  Wrench,
 } from 'lucide-react';
 import {
+  EventLogCategory,
   HudSnapshot,
   PlayerCount,
   PlayerHudInfo,
@@ -22,9 +31,13 @@ interface GameHudProps {
   muted: boolean;
   showTouch: boolean;
   craftOpen: boolean;
+  weaponShopOpen: boolean;
   onToggleMute: () => void;
   onToggleTouch: () => void;
   onToggleCraft: () => void;
+  onToggleWeaponShop: () => void;
+  onOpenMusic: () => void;
+  onOpenSettings: () => void;
   onSwitchPlayerCount: (count: PlayerCount) => void;
   onPause: () => void;
 }
@@ -74,6 +87,19 @@ function WeatherIcon({ type }: { type: WeatherType }) {
   return <Sun className="w-3.5 h-3.5 text-sky-300 shrink-0" />;
 }
 
+function EventCategoryIcon({ category }: { category: EventLogCategory }) {
+  if (category === 'weather') {
+    return <CloudLightning className="w-3 h-3 text-amber-400 shrink-0" />;
+  }
+  if (category === 'resource') {
+    return <Package className="w-3 h-3 text-emerald-400 shrink-0" />;
+  }
+  if (category === 'craft') {
+    return <Wrench className="w-3 h-3 text-sky-400 shrink-0" />;
+  }
+  return <AlertTriangle className="w-3 h-3 text-rose-400 shrink-0" />;
+}
+
 function PlayerCluster({
   player,
   align,
@@ -103,7 +129,7 @@ function PlayerCluster({
             className="inline-block w-2 h-2 rounded-xs shrink-0"
             style={{ backgroundColor: tagColor }}
           />
-          {labelPrefix} · {player.name.split(' ')[0]}
+          {labelPrefix} · {player.name}
         </span>
         <span className="font-mono-num text-slate-300 shrink-0">
           {player.downed
@@ -141,6 +167,9 @@ function PlayerCluster({
         >
           RAD {radPct}%
         </span>
+        <span className="text-amber-300 font-semibold">
+          {player.credits} CR
+        </span>
         <span
           className={
             player.specialReadyRatio >= 1
@@ -162,9 +191,13 @@ export function GameHud({
   muted,
   showTouch,
   craftOpen,
+  weaponShopOpen,
   onToggleMute,
   onToggleTouch,
   onToggleCraft,
+  onToggleWeaponShop,
+  onOpenMusic,
+  onOpenSettings,
   onSwitchPlayerCount,
   onPause,
 }: GameHudProps) {
@@ -179,25 +212,36 @@ export function GameHud({
 
         {/* Center Status + Resources + Controls */}
         <div className="flex flex-col items-center gap-1 min-w-0">
-          <div className="pointer-events-auto flex items-center gap-1 sm:gap-1.5 bg-[#111518]/90 border border-white/10 rounded-lg px-2 py-1">
+          <div className="pointer-events-auto flex flex-wrap items-center justify-center gap-1 sm:gap-1.5 bg-[#111518]/90 border border-white/10 rounded-lg px-2 py-1">
             <span className="font-display text-xs sm:text-sm font-bold tracking-wide text-amber-400 px-1 whitespace-nowrap">
-              {hud.mode === 'COOP' ? `OLEADA ${hud.wave}` : 'DUELO'}
+              {hud.isOnline
+                ? 'PVP ONLINE'
+                : hud.mode === 'COOP'
+                ? `OLEADA ${hud.wave}`
+                : 'DUELO'}
             </span>
             <span className="text-slate-600">·</span>
             <span className="font-mono-num text-xs text-slate-200 px-1 whitespace-nowrap">
               {hud.teamScore} PTS
             </span>
 
-            <button
-              type="button"
-              onClick={() => onSwitchPlayerCount(nextCount)}
-              title={`Cambiar a ${nextCount} ${nextCount === 1 ? 'Jugador' : 'Jugadores'}`}
-              aria-label={`Cambiar a ${nextCount} jugadores`}
-              className="min-h-[32px] px-2 py-1 rounded bg-[#1e262d] text-sky-300 hover:bg-[#2a343d] text-xs font-mono-num font-bold inline-flex items-center gap-1 cursor-pointer whitespace-nowrap"
-            >
-              <Users className="w-3.5 h-3.5" />
-              <span>{hud.playerCount}J</span>
-            </button>
+            {hud.isOnline ? (
+              <span className="min-h-[32px] px-2 py-1 rounded bg-sky-500/15 text-sky-300 text-xs font-mono-num font-bold inline-flex items-center gap-1 whitespace-nowrap">
+                <Globe className="w-3.5 h-3.5" />
+                <span>TÚ: J{hud.localPlayerId}</span>
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => onSwitchPlayerCount(nextCount)}
+                title={`Cambiar a ${nextCount} ${nextCount === 1 ? 'Jugador' : 'Jugadores'}`}
+                aria-label={`Cambiar a ${nextCount} jugadores`}
+                className="min-h-[32px] px-2 py-1 rounded bg-[#1e262d] text-sky-300 hover:bg-[#2a343d] text-xs font-mono-num font-bold inline-flex items-center gap-1 cursor-pointer whitespace-nowrap"
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span>{hud.playerCount}J</span>
+              </button>
+            )}
 
             <button
               type="button"
@@ -211,6 +255,29 @@ export function GameHud({
             >
               <Hammer className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Crafteo</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onToggleWeaponShop}
+              aria-label="Abrir tienda de armas"
+              className={`min-h-[32px] px-2 py-1 rounded text-xs font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer whitespace-nowrap ${
+                weaponShopOpen
+                  ? 'bg-sky-400 text-slate-950'
+                  : 'bg-[#1e262d] text-sky-300 hover:bg-[#2a343d]'
+              }`}
+            >
+              <Crosshair className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Armas</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onOpenMusic}
+              aria-label="Música del celular"
+              className="min-h-[32px] min-w-[32px] px-1.5 py-1 rounded bg-[#1e262d] text-amber-300 hover:text-amber-200 inline-flex items-center justify-center cursor-pointer"
+            >
+              <Music className="w-3.5 h-3.5" />
             </button>
 
             <button
@@ -237,6 +304,15 @@ export function GameHud({
               ) : (
                 <Volume2 className="w-3.5 h-3.5" />
               )}
+            </button>
+
+            <button
+              type="button"
+              onClick={onOpenSettings}
+              aria-label="Configuraciones"
+              className="min-h-[32px] min-w-[32px] px-1.5 py-1 rounded bg-[#1e262d] text-slate-300 hover:text-white inline-flex items-center justify-center cursor-pointer"
+            >
+              <Settings className="w-3.5 h-3.5" />
             </button>
 
             <button
@@ -293,6 +369,47 @@ export function GameHud({
             <span className="text-slate-300">{wMeta.hint}</span>
           </div>
         )
+      )}
+
+      {/* Top-of-screen Log de Eventos panel */}
+      {hud.eventLog.length > 0 && (
+        <section
+          aria-label="Log de Eventos"
+          className="mx-auto w-full max-w-[340px] sm:max-w-[430px] bg-[#111518]/80 border border-white/10 rounded-lg px-2.5 py-1.5"
+        >
+          <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-0.5 mb-1">
+            <span className="inline-flex items-center gap-1 text-[10px] font-display font-bold uppercase tracking-wider text-amber-400">
+              <Radio className="w-3 h-3 shrink-0" />
+              Log de Eventos
+            </span>
+            <span className="text-[10px] font-mono-num text-slate-500">
+              EN VIVO
+            </span>
+          </div>
+          <ul className="flex flex-col gap-0.5">
+            {hud.eventLog
+              .slice(-3)
+              .reverse()
+              .map((entry, idx) => (
+                <li
+                  key={entry.id}
+                  className={`flex items-center gap-1.5 text-[11px] leading-tight ${
+                    idx === 0
+                      ? 'text-slate-100 font-medium'
+                      : idx === 1
+                      ? 'text-slate-300/85'
+                      : 'text-slate-400/70'
+                  }`}
+                >
+                  <EventCategoryIcon category={entry.category} />
+                  <span className="font-mono-num text-[10px] text-slate-500 shrink-0">
+                    {formatTimeMMSS(entry.timestampSec)}
+                  </span>
+                  <span className="truncate">{entry.text}</span>
+                </li>
+              ))}
+          </ul>
+        </section>
       )}
     </div>
   );

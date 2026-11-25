@@ -1,9 +1,10 @@
-import {
+import type {
   CharacterClassDef,
   CharacterClassId,
   CraftRecipe,
   EmoteDef,
-} from './types';
+  WeaponDef,
+} from './types.ts';
 
 export const CHARACTER_CLASSES: Record<CharacterClassId, CharacterClassDef> = {
   medic: {
@@ -145,6 +146,69 @@ export const CRAFT_RECIPES: CraftRecipe[] = [
     shortLabel: 'Torreta',
     desc: 'Dispara automáticamente contra mutantes cercanos.',
     cost: { wood: 0, metal: 3, electronics: 3 },
+  },
+];
+
+export const WEAPON_SHOP_ITEMS: WeaponDef[] = [
+  {
+    id: 'default',
+    name: 'Arma de Clase',
+    shortLabel: 'Base',
+    desc: 'Armamento estándar original de tu superviviente.',
+    costCredits: 0,
+    damageLabel: 'Base',
+    rateLabel: 'Estándar',
+    color: '#94a3b8',
+  },
+  {
+    id: 'shotgun',
+    name: 'Escopeta Táctica',
+    shortLabel: 'Escopeta',
+    desc: 'Dispara 5 perdigones en abanico con gran empuje cercano.',
+    costCredits: 180,
+    damageLabel: '5×16',
+    rateLabel: 'Media',
+    color: '#f97316',
+  },
+  {
+    id: 'smg',
+    name: 'Subfusil Rápido',
+    shortLabel: 'Subfusil',
+    desc: 'Alta cadencia de ráfaga para barrer grupos de mutantes.',
+    costCredits: 240,
+    damageLabel: '16',
+    rateLabel: 'Muy Alta',
+    color: '#fbbf24',
+  },
+  {
+    id: 'flamethrower',
+    name: 'Lanzallamas Nuclear',
+    shortLabel: 'Lanzallamas',
+    desc: 'Llamarada continua que atraviesa y quema a corta distancia.',
+    costCredits: 320,
+    damageLabel: '14/tick',
+    rateLabel: 'Continua',
+    color: '#fb7185',
+  },
+  {
+    id: 'launcher',
+    name: 'Lanzagranadas',
+    shortLabel: 'Granadas',
+    desc: 'Proyectiles explosivos en área que limpian charcos ácidos.',
+    costCredits: 420,
+    damageLabel: '105 Área',
+    rateLabel: 'Lenta',
+    color: '#84cc16',
+  },
+  {
+    id: 'laser_cannon',
+    name: 'Cañón Láser PEM',
+    shortLabel: 'Láser PEM',
+    desc: 'Haz energético perforante capaz de atravesar toda una fila.',
+    costCredits: 550,
+    damageLabel: '82 Perf.',
+    rateLabel: 'Media',
+    color: '#22d3ee',
   },
 ];
 

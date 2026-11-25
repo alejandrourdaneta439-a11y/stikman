@@ -1,10 +1,11 @@
-import { soundEngine } from '../audio/soundEngine';
+import { soundEngine } from '../audio/soundEngine.ts';
 import {
   CHARACTER_CLASSES,
   CRAFT_RECIPES,
   EMOTE_LIST,
-} from './characters';
-import {
+  WEAPON_SHOP_ITEMS,
+} from './characters.ts';
+import type {
   Barrel,
   BuiltStructure,
   CharacterClassId,
@@ -12,6 +13,8 @@ import {
   EmoteId,
   EnemyKind,
   EnemyState,
+  EventLogCategory,
+  EventLogEntry,
   FloatingText,
   GameMode,
   HazardZone,
@@ -27,9 +30,10 @@ import {
   ResourceType,
   SupplyDrop,
   SupplyKind,
+  WeaponId,
   WeatherState,
   WeatherType,
-} from './types';
+} from './types.ts';
 
 export const WEATHER_CYCLE_SEC = 120;
 const WEATHER_ROTATION: WeatherType[] = [
@@ -130,7 +134,10 @@ export interface SimulationWorld {
   particles: Particle[];
   floatingTexts: FloatingText[];
   weather: WeatherState;
+  eventLog: EventLogEntry[];
 
+  elapsedSec: number;
+  weatherWarningLogged: boolean;
   supplyTimer: number;
   shakeIntensity: number;
   hitstopTimer: number;
@@ -143,7 +150,8 @@ function createPlayer(
   id: 1 | 2,
   classId: CharacterClassId,
   x: number,
-  facing: 1 | -1
+  facing: 1 | -1,
+  customName = ''
 ): PlayerState {
   const def = CHARACTER_CLASSES[classId];
   const scarfPoints = Array.from({ length: 5 }, (_, i) => ({
@@ -153,6 +161,7 @@ function createPlayer(
   return {
     id,
     classId,
+    customName: customName.trim(),
     x,
     y: GROUND_Y,
     vx: 0,
@@ -179,6 +188,9 @@ function createPlayer(
     maxSpecialCooldown: def.specialCooldown,
 
     hasPickaxe: false,
+    credits: 150,
+    ownedWeapons: ['default'],
+    equippedWeapon: 'default',
     activeEmote: null,
     emoteTimer: 0,
 
@@ -230,10 +242,12 @@ export function createWorld(
   mode: GameMode,
   p1Class: CharacterClassId,
   p2Class: CharacterClassId,
-  playerCount: PlayerCount = 2
+  playerCount: PlayerCount = 2,
+  p1CustomName = '',
+  p2CustomName = ''
 ): SimulationWorld {
-  const p1 = createPlayer(1, p1Class, mode === 'PVP' ? 220 : 540, 1);
-  const p2 = createPlayer(2, p2Class, mode === 'PVP' ? 1060 : 740, -1);
+  const p1 = createPlayer(1, p1Class, mode === 'PVP' ? 220 : 540, 1, p1CustomName);
+  const p2 = createPlayer(2, p2Class, mode === 'PVP' ? 1060 : 740, -1, p2CustomName);
 
   if (playerCount === 1 && mode === 'COOP') {
     p2.enabled = false;
@@ -241,6 +255,7 @@ export function createWorld(
     p2.hp = 0;
   } else if (playerCount === 1 && mode === 'PVP') {
     p2.isBot = true;
+    if (!p2.customName) p2.customName = 'Centinela IA';
   }
 
   return {
@@ -316,7 +331,20 @@ export function createWorld(
       acidPoolTimer: 6,
       drainTickTimer: 0,
     },
+    eventLog: [
+      {
+        id: 1,
+        text:
+          mode === 'COOP'
+            ? 'Supervivencia iniciada · Oleada 1'
+            : 'Duelo nuclear iniciado · Clima despejado',
+        category: 'weather',
+        timestampSec: 0,
+      },
+    ],
 
+    elapsedSec: 0,
+    weatherWarningLogged: false,
     supplyTimer: 8,
     shakeIntensity: 0,
     hitstopTimer: 0,
@@ -324,6 +352,22 @@ export function createWorld(
     ambientAshTimer: 0,
     geigerTimer: 0,
   };
+}
+
+function pushEvent(
+  world: SimulationWorld,
+  text: string,
+  category: EventLogCategory
+): void {
+  world.eventLog.push({
+    id: world.nextId++,
+    text,
+    category,
+    timestampSec: Math.floor(world.elapsedSec),
+  });
+  if (world.eventLog.length > 12) {
+    world.eventLog.shift();
+  }
 }
 
 function spawnParticles(
@@ -461,6 +505,7 @@ export function craftItem(
   world.resources.metal -= cost.metal;
   world.resources.electronics -= cost.electronics;
   player.craftedCount += 1;
+  player.credits += 40;
   player.score += 80;
   world.teamScore += 80;
   soundEngine.playCraft();
@@ -534,7 +579,56 @@ export function craftItem(
     addFloatingText(world, player.x, player.y - 76, 'TORRETA ACTIVA', '#fbbf24');
   }
 
+  const recipeName =
+    CRAFT_RECIPES.find((r) => r.id === itemId)?.name ?? itemId;
+  pushEvent(world, `J${player.id} fabricó ${recipeName}`, 'craft');
+
   spawnParticles(world, player.x, player.y - 26, 10, '#38bdf8', 40, 150, 2, 4, 120);
+  return true;
+}
+
+export function buyOrEquipWeapon(
+  world: SimulationWorld,
+  playerId: 1 | 2,
+  weaponId: WeaponId
+): boolean {
+  const player = world.players[playerId - 1];
+  if (!player || player.dead || player.downed) return false;
+  const weapon = WEAPON_SHOP_ITEMS.find((w) => w.id === weaponId);
+  if (!weapon) return false;
+
+  if (player.ownedWeapons.includes(weaponId)) {
+    if (player.equippedWeapon === weaponId) return false;
+    player.equippedWeapon = weaponId;
+    soundEngine.playCraft();
+    addFloatingText(
+      world,
+      player.x,
+      player.y - 78,
+      `EQUIPADO: ${weapon.shortLabel.toUpperCase()}`,
+      weapon.color
+    );
+    pushEvent(world, `J${player.id} equipó ${weapon.name}`, 'craft');
+    return true;
+  }
+
+  if (player.credits < weapon.costCredits) {
+    return false;
+  }
+
+  player.credits -= weapon.costCredits;
+  player.ownedWeapons.push(weaponId);
+  player.equippedWeapon = weaponId;
+  soundEngine.playPickup();
+  spawnParticles(world, player.x, player.y - 30, 14, weapon.color, 50, 170, 2, 4, 120);
+  addFloatingText(
+    world,
+    player.x,
+    player.y - 82,
+    `¡${weapon.name.toUpperCase()}!`,
+    weapon.color
+  );
+  pushEvent(world, `J${player.id} compró ${weapon.name}`, 'craft');
   return true;
 }
 
@@ -549,6 +643,7 @@ export function sendEmote(
   if (!emote) return;
   player.activeEmote = emote;
   player.emoteTimer = 3.2;
+  pushEvent(world, `J${player.id} señaló: ${emote.label}`, 'combat');
   soundEngine.playRadioChirp();
 }
 
@@ -565,15 +660,24 @@ function harvestNode(
   node.hitFlashTimer = 0.14;
 
   world.resources[node.type] += yieldAmt;
+  player.credits += 35 * yieldAmt;
   player.score += 35 * yieldAmt;
   world.teamScore += 35 * yieldAmt;
 
-  const labelMap: Record<ResourceType, { label: string; color: string }> = {
-    wood: { label: 'MADERA', color: '#d97706' },
-    metal: { label: 'METAL', color: '#94a3b8' },
-    electronics: { label: 'CIRCUITO', color: '#38bdf8' },
+  const labelMap: Record<
+    ResourceType,
+    { label: string; eventName: string; color: string }
+  > = {
+    wood: { label: 'MADERA', eventName: 'Madera', color: '#d97706' },
+    metal: { label: 'METAL', eventName: 'Metal', color: '#94a3b8' },
+    electronics: { label: 'CIRCUITO', eventName: 'Circuitos', color: '#38bdf8' },
   };
   const info = labelMap[node.type];
+  pushEvent(
+    world,
+    `Nuevo recurso encontrado: +${yieldAmt} ${info.eventName}`,
+    'resource'
+  );
   addFloatingText(
     world,
     node.x,
@@ -642,6 +746,10 @@ function damagePlayer(
   player.hp = Math.max(0, player.hp - finalDamage);
   player.rad = Math.min(100, player.rad + finalRad);
   player.hitFlashTimer = 0.14;
+  if (!attackerId) {
+    // Brief grace period against zombie/acid bursts so players aren't deleted instantly
+    player.invulnTimer = Math.max(player.invulnTimer, 0.55);
+  }
   player.vx += knockX;
   player.squashX = 1.25;
   player.squashY = 0.78;
@@ -663,8 +771,9 @@ function damagePlayer(
   if (player.hp <= 0) {
     if (world.mode === 'COOP' && world.playerCount === 2) {
       player.downed = true;
-      player.downedTimer = 15;
+      player.downedTimer = 22;
       player.reviveProgress = 0;
+      pushEvent(world, `¡J${player.id} herido! Acércate a revivir`, 'combat');
       addFloatingText(world, player.x, player.y - 80, '¡HERIDO!', '#f59e0b');
       world.shakeIntensity = Math.max(world.shakeIntensity, 8);
     } else {
@@ -703,6 +812,7 @@ function damageEnemy(
 
   if (enemy.hp <= 0) {
     attacker.kills += 1;
+    attacker.credits += Math.round(enemy.scoreValue * 0.6);
     attacker.score += enemy.scoreValue;
     world.teamScore += enemy.scoreValue;
 
@@ -717,6 +827,10 @@ function damageEnemy(
     } else if (roll < 0.92) {
       world.resources.electronics += 1;
       addFloatingText(world, enemy.x, enemy.y - 40, '+1 CIRCUITO', '#38bdf8');
+    }
+
+    if (enemy.kind === 'brute') {
+      pushEvent(world, '¡Coloso radiactivo eliminado!', 'combat');
     }
 
     spawnParticles(world, enemy.x, enemy.y - enemy.h * 0.5, 18, '#84cc16', 90, 280, 3, 6);
@@ -843,6 +957,10 @@ function spawnEnemy(world: SimulationWorld): void {
     targetPlayerId: target,
     scoreValue: s.score,
   });
+
+  if (kind === 'brute') {
+    pushEvent(world, '¡Alerta! Coloso radiactivo detectado', 'combat');
+  }
 }
 
 function performPlayerAttack(
@@ -855,7 +973,7 @@ function performPlayerAttack(
   player.attackTimer = def.attackCooldown * cdMult;
   player.attackAnimTimer = 0.18;
 
-  soundEngine.playShoot(player.classId);
+  soundEngine.playShoot(player.classId, player.equippedWeapon);
 
   // Check if player is right next to a resource node to harvest it!
   for (const node of world.resourceNodes) {
@@ -872,6 +990,123 @@ function performPlayerAttack(
   const ownerType = player.id === 1 ? 'player1' : 'player2';
   const muzzleX = player.x + player.facing * 24;
   const muzzleY = player.y - 38;
+  const pickaxeBonus = player.hasPickaxe ? 4 : 0;
+
+  if (player.equippedWeapon === 'shotgun') {
+    player.attackTimer = 0.56 * cdMult;
+    for (let k = -2; k <= 2; k++) {
+      const vy = k * 82 + (Math.random() - 0.5) * 24;
+      world.projectiles.push({
+        id: world.nextId++,
+        ownerType,
+        kind: 'bullet',
+        x: muzzleX,
+        y: muzzleY,
+        vx: player.facing * (700 + Math.random() * 60),
+        vy,
+        radius: 4.5,
+        damage: Math.round((16 + pickaxeBonus * 0.5) * dmgBoost),
+        radDamage: 0,
+        life: 0.45,
+        pierce: 1,
+        color: '#f97316',
+        trail: [],
+      });
+    }
+    player.vx -= player.facing * 95;
+    world.shakeIntensity = Math.max(world.shakeIntensity, 4);
+    return;
+  }
+
+  if (player.equippedWeapon === 'smg') {
+    player.attackTimer = 0.13 * cdMult;
+    world.projectiles.push({
+      id: world.nextId++,
+      ownerType,
+      kind: 'bullet',
+      x: muzzleX,
+      y: muzzleY + (Math.random() - 0.5) * 6,
+      vx: player.facing * 840,
+      vy: (Math.random() - 0.5) * 48,
+      radius: 4,
+      damage: Math.round((16 + pickaxeBonus * 0.5) * dmgBoost),
+      radDamage: 0,
+      life: 0.95,
+      pierce: 1,
+      color: '#fbbf24',
+      trail: [],
+    });
+    player.vx -= player.facing * 12;
+    return;
+  }
+
+  if (player.equippedWeapon === 'flamethrower') {
+    player.attackTimer = 0.1 * cdMult;
+    for (let f = 0; f < 2; f++) {
+      world.projectiles.push({
+        id: world.nextId++,
+        ownerType,
+        kind: 'plasma',
+        x: muzzleX + player.facing * 4,
+        y: muzzleY + (Math.random() - 0.5) * 8,
+        vx: player.facing * (450 + Math.random() * 90),
+        vy: (Math.random() - 0.5) * 75,
+        radius: 7.5,
+        damage: Math.round((14 + pickaxeBonus * 0.5) * dmgBoost),
+        radDamage: 0,
+        life: 0.34,
+        pierce: 3,
+        color: f === 0 ? '#fb7185' : '#f97316',
+        trail: [],
+      });
+    }
+    return;
+  }
+
+  if (player.equippedWeapon === 'launcher') {
+    player.attackTimer = 0.78 * cdMult;
+    world.projectiles.push({
+      id: world.nextId++,
+      ownerType,
+      kind: 'grenade',
+      x: muzzleX,
+      y: muzzleY,
+      vx: player.facing * 520,
+      vy: -250,
+      radius: 7,
+      damage: Math.round((105 + pickaxeBonus * 2) * dmgBoost),
+      radDamage: 0,
+      life: 1.8,
+      pierce: 1,
+      color: '#84cc16',
+      trail: [],
+    });
+    player.vx -= player.facing * 70;
+    return;
+  }
+
+  if (player.equippedWeapon === 'laser_cannon') {
+    player.attackTimer = 0.64 * cdMult;
+    world.projectiles.push({
+      id: world.nextId++,
+      ownerType,
+      kind: 'rail',
+      x: muzzleX,
+      y: muzzleY,
+      vx: player.facing * 1280,
+      vy: 0,
+      radius: 7,
+      damage: Math.round((82 + pickaxeBonus * 2) * dmgBoost),
+      radDamage: 0,
+      life: 1.1,
+      pierce: 5,
+      color: '#22d3ee',
+      trail: [],
+    });
+    player.vx -= player.facing * 90;
+    world.shakeIntensity = Math.max(world.shakeIntensity, 5);
+    return;
+  }
 
   if (player.classId === 'juggernaut') {
     const hitCenterX = player.x + player.facing * 52;
@@ -1161,6 +1396,7 @@ export function stepWorld(
   if (world.gameOver) return;
 
   const dt = Math.min(rawDt, 0.05);
+  world.elapsedSec += dt;
   const effectiveInputs: [PlayerInput, PlayerInput] = [
     inputs[0],
     world.players[1].isBot ? computeBotInput(world, world.players[1]) : inputs[1],
@@ -1214,6 +1450,21 @@ export function stepWorld(
 
   // 2-Minute Dynamic Weather Cycle
   world.weather.timer -= dt;
+  if (world.weather.timer <= 12 && !world.weatherWarningLogged) {
+    world.weatherWarningLogged = true;
+    const nextLabels: Record<WeatherType, string> = {
+      clear: 'Cielo despejado',
+      radiation_storm: 'Tormenta de radiación',
+      acid_rain: 'Lluvia ácida',
+      ash_blizzard: 'Ventisca de ceniza',
+    };
+    pushEvent(
+      world,
+      `Alerta: ${nextLabels[world.weather.next]} en 12s`,
+      'weather'
+    );
+  }
+
   if (world.weather.timer <= 0) {
     const nextWeather = world.weather.next;
     const nextIdx =
@@ -1224,6 +1475,7 @@ export function stepWorld(
     world.weather.duration = WEATHER_CYCLE_SEC;
     world.weather.windDir = Math.random() < 0.5 ? 1 : -1;
     world.weather.acidPoolTimer = 5.0;
+    world.weatherWarningLogged = false;
 
     if (nextWeather !== 'clear') {
       soundEngine.playSiren();
@@ -1231,22 +1483,33 @@ export function stepWorld(
       soundEngine.playWaveClear();
     }
 
-    const bannerMap: Record<WeatherType, { text: string; color: string }> = {
-      clear: { text: 'CLIMA: CIELO DESPEJADO', color: '#38bdf8' },
+    const bannerMap: Record<
+      WeatherType,
+      { text: string; log: string; color: string }
+    > = {
+      clear: {
+        text: 'CLIMA: CIELO DESPEJADO',
+        log: 'Clima despejado · Radiación ambiental baja',
+        color: '#38bdf8',
+      },
       radiation_storm: {
         text: 'TORMENTA RADIACTIVA · ¡BUSCA REFUGIO!',
+        log: 'Tormenta de radiación comenzando',
         color: '#f59e0b',
       },
       acid_rain: {
         text: 'LLUVIA ÁCIDA · DAÑA ESTRUCTURAS',
+        log: 'Lluvia ácida comenzando · Protege estructuras',
         color: '#84cc16',
       },
       ash_blizzard: {
         text: 'VENTISCA DE CENIZA · VIENTO FUERTE',
+        log: 'Ventisca de ceniza comenzando',
         color: '#cbd5e1',
       },
     };
     const msg = bannerMap[nextWeather];
+    pushEvent(world, msg.log, 'weather');
     addFloatingText(world, ARENA_W * 0.5, 195, msg.text, msg.color);
   }
 
@@ -1299,6 +1562,7 @@ export function stepWorld(
       life: 18,
       bobPhase: Math.random() * 6,
     });
+    pushEvent(world, 'Nuevo suministro aéreo lanzado', 'resource');
   }
 
   // Co-op Wave Spawner
@@ -1317,10 +1581,12 @@ export function stepWorld(
       world.spawnTimer = 2.0;
       world.waveBannerTimer = 2.6;
       soundEngine.playWaveClear();
+      pushEvent(world, `Oleada ${world.wave} comenzando`, 'combat');
       for (const p of world.players) {
         if (p.enabled && !p.dead) {
           p.hp = Math.min(p.maxHp, p.hp + 20);
           p.downed = false;
+          p.credits += 120;
           p.score += 150;
         }
       }
@@ -1373,6 +1639,15 @@ export function stepWorld(
     }
 
     if (st.life <= 0 || st.hp <= 0) {
+      if (st.hp <= 0) {
+        const stLabel =
+          st.kind === 'shelter'
+            ? 'Refugio destruido'
+            : st.kind === 'turret'
+            ? 'Torreta destruida'
+            : 'Trampa destruida';
+        pushEvent(world, stLabel, 'craft');
+      }
       spawnParticles(world, st.x, st.y - st.h * 0.5, 10, '#94a3b8', 50, 180, 2, 5);
       world.structures.splice(i, 1);
       continue;
@@ -1476,9 +1751,11 @@ export function stepWorld(
           p.rad = Math.max(0, p.rad - 30);
           p.invulnTimer = 1.5;
           ally.revives += 1;
+          ally.credits += 120;
           ally.score += 250;
           world.teamScore += 250;
           soundEngine.playRevive();
+          pushEvent(world, `J${ally.id} revivió a J${p.id}`, 'combat');
           addFloatingText(world, p.x, p.y - 76, '¡REVIVIDO!', '#34d399');
           spawnShockwave(world, p.x, p.y - 24, '#34d399', 80);
         }
@@ -1612,8 +1889,8 @@ export function stepWorld(
       !isUnderShelter(world, p.x, p.y)
     ) {
       const isRadStorm = world.weather.current === 'radiation_storm';
-      const radGain = (isRadStorm ? 9.5 : 4.5) * (1 - def.radResist) * dt;
-      const hpDrain = (isRadStorm ? 2.8 : 1.5) * dt;
+      const radGain = (isRadStorm ? 6.8 : 3.2) * (1 - def.radResist) * dt;
+      const hpDrain = (isRadStorm ? 1.8 : 1.0) * dt;
       p.rad = Math.min(100, p.rad + radGain);
       p.hp = Math.max(0, p.hp - hpDrain);
       anyHighRad = true;
@@ -1625,9 +1902,9 @@ export function stepWorld(
 
     if (p.rad >= 85) {
       anyHighRad = true;
-      p.hp = Math.max(1, p.hp - (p.rad >= 100 ? 6 : 2.5) * dt);
+      p.hp = Math.max(1, p.hp - (p.rad >= 100 ? 4.2 : 1.8) * dt);
     } else if (p.rad > 0 && world.weather.current === 'clear') {
-      p.rad = Math.max(0, p.rad - 1.4 * dt);
+      p.rad = Math.max(0, p.rad - 1.6 * dt);
     }
   }
 
@@ -1650,7 +1927,7 @@ export function stepWorld(
     }
 
     if (h.kind === 'acid' && h.tickTimer <= 0) {
-      h.tickTimer = 0.45;
+      h.tickTimer = 0.65;
       for (const p of world.players) {
         if (
           !p.dead &&
@@ -1658,7 +1935,7 @@ export function stepWorld(
           Math.abs(p.x - h.x) < h.radius &&
           Math.abs(p.y - h.y) < 35
         ) {
-          damagePlayer(world, p, 5, 9);
+          damagePlayer(world, p, 3, 4);
         }
       }
     } else if (h.kind === 'healDome' && h.tickTimer <= 0) {
@@ -1748,20 +2025,25 @@ export function stepWorld(
         if (s.kind === 'medkit') {
           const heal = p.classId === 'medic' ? 65 : 45;
           p.hp = Math.min(p.maxHp, p.hp + heal);
+          pushEvent(world, `J${p.id} recogió Botiquín (+${heal} HP)`, 'resource');
           addFloatingText(world, p.x, p.y - 72, `+${heal} VIDA`, '#34d399');
         } else if (s.kind === 'antirad') {
           p.rad = Math.max(0, p.rad - 55);
           p.hp = Math.min(p.maxHp, p.hp + 15);
+          pushEvent(world, `J${p.id} recogió Yodo Anti-Rad`, 'resource');
           addFloatingText(world, p.x, p.y - 72, '-55 RAD', '#38bdf8');
         } else if (s.kind === 'overcharge') {
           p.overchargeTimer = 7.0;
+          pushEvent(world, `J${p.id} activó Sobrecarga táctica`, 'resource');
           addFloatingText(world, p.x, p.y - 72, 'SOBRECARGA!', '#fbbf24');
         } else {
           world.resources.wood += 2;
           world.resources.metal += 2;
           world.resources.electronics += 2;
+          p.credits += 100;
           p.score += 180;
           world.teamScore += 180;
+          pushEvent(world, `Nuevo recurso encontrado: +2 Todo`, 'resource');
           addFloatingText(world, p.x, p.y - 72, '+2 TODO RECURSO', '#fbbf24');
         }
         spawnParticles(world, s.x, s.y - 14, 12, '#34d399', 50, 160, 2, 4, 80);
@@ -1826,18 +2108,18 @@ export function stepWorld(
             kind: 'droneLaser',
             x: e.x,
             y: e.y + 8,
-            vx: Math.cos(angle) * 460,
-            vy: Math.sin(angle) * 460,
+            vx: Math.cos(angle) * 430,
+            vy: Math.sin(angle) * 430,
             radius: 5,
-            damage: 14,
-            radDamage: 6,
+            damage: 8,
+            radDamage: 3,
             life: 1.8,
             pierce: 1,
             color: '#f43f5e',
             trail: [],
           });
           e.state = 'recover';
-          e.stateTimer = 1.0;
+          e.stateTimer = 1.45;
         }
       } else {
         e.stateTimer -= dt;
@@ -1850,9 +2132,9 @@ export function stepWorld(
     }
 
     const speed =
-      e.kind === 'crawler' ? 190 : e.kind === 'spitter' ? 120 : 92;
+      e.kind === 'crawler' ? 152 : e.kind === 'spitter' ? 105 : 82;
     const attackRange =
-      e.kind === 'crawler' ? 70 : e.kind === 'spitter' ? 340 : 88;
+      e.kind === 'crawler' ? 68 : e.kind === 'spitter' ? 340 : 88;
 
     if (e.state === 'chase') {
       e.facing = dx >= 0 ? 1 : -1;
@@ -1866,7 +2148,7 @@ export function stepWorld(
 
       if (Math.abs(dx) < attackRange && Math.abs(dy) < 90) {
         e.state = 'windup';
-        e.stateTimer = e.kind === 'brute' ? 0.6 : 0.42;
+        e.stateTimer = e.kind === 'brute' ? 0.72 : 0.5;
         e.vx *= 0.2;
       }
     } else if (e.state === 'windup') {
@@ -1874,8 +2156,8 @@ export function stepWorld(
       e.vx *= 0.88;
       if (e.stateTimer <= 0) {
         if (e.kind === 'crawler') {
-          e.vx = e.facing * 380;
-          e.vy = -210;
+          e.vx = e.facing * 330;
+          e.vy = -195;
           e.state = 'attack';
           e.stateTimer = 0.28;
         } else if (e.kind === 'spitter') {
@@ -1885,28 +2167,28 @@ export function stepWorld(
             kind: 'acid',
             x: e.x + e.facing * 16,
             y: e.y - 40,
-            vx: e.facing * 330,
+            vx: e.facing * 320,
             vy: -260,
             radius: 7,
-            damage: 13,
-            radDamage: 12,
+            damage: 7,
+            radDamage: 5,
             life: 2.0,
             pierce: 1,
             color: '#84cc16',
             trail: [],
           });
           e.state = 'recover';
-          e.stateTimer = 1.25;
+          e.stateTimer = 1.65;
         } else {
           world.shakeIntensity = Math.max(world.shakeIntensity, 9);
           spawnShockwave(world, e.x, e.y, '#84cc16', 110);
           for (const p of world.players) {
             if (!p.dead && !p.downed && Math.hypot(p.x - e.x, p.y - e.y) < 115) {
-              damagePlayer(world, p, 24, 10, (p.x >= e.x ? 1 : -1) * 300);
+              damagePlayer(world, p, 14, 5, (p.x >= e.x ? 1 : -1) * 260);
             }
           }
           e.state = 'recover';
-          e.stateTimer = 1.1;
+          e.stateTimer = 1.5;
         }
       }
     } else if (e.state === 'attack') {
@@ -1917,9 +2199,9 @@ export function stepWorld(
           !p.downed &&
           Math.hypot(p.x - e.x, p.y - 32 - (e.y - 26)) < 42
         ) {
-          damagePlayer(world, p, 15, 7, e.facing * 200);
+          damagePlayer(world, p, 8, 3, e.facing * 170);
           e.state = 'recover';
-          e.stateTimer = 0.65;
+          e.stateTimer = 0.95;
           break;
         }
       }
@@ -1974,6 +2256,63 @@ export function stepWorld(
 
     pr.x += pr.vx * dt;
     pr.y += pr.vy * dt;
+
+    if (pr.kind === 'grenade') {
+      const attackerId = pr.ownerType === 'player1' ? 1 : 2;
+      let shouldDetonate =
+        pr.life <= 0 || pr.x < 10 || pr.x > ARENA_W - 10 || pr.y >= GROUND_Y;
+      if (!shouldDetonate && pr.vy > 0) {
+        for (const plat of PLATFORMS) {
+          if (
+            plat.style !== 'ground' &&
+            pr.x >= plat.x &&
+            pr.x <= plat.x + plat.w &&
+            pr.y >= plat.y &&
+            pr.y <= plat.y + 20
+          ) {
+            shouldDetonate = true;
+            break;
+          }
+        }
+      }
+      if (!shouldDetonate) {
+        for (const enemy of world.enemies) {
+          if (
+            Math.abs(pr.x - enemy.x) < enemy.w * 0.7 &&
+            pr.y >= enemy.y - enemy.h &&
+            pr.y <= enemy.y
+          ) {
+            shouldDetonate = true;
+            break;
+          }
+        }
+      }
+      if (!shouldDetonate && world.mode === 'PVP') {
+        const opp = world.players[attackerId === 1 ? 1 : 0];
+        if (
+          !opp.dead &&
+          Math.abs(pr.x - opp.x) < 22 &&
+          pr.y >= opp.y - opp.h &&
+          pr.y <= opp.y
+        ) {
+          shouldDetonate = true;
+        }
+      }
+      if (shouldDetonate) {
+        triggerExplosion(
+          world,
+          pr.x,
+          Math.min(GROUND_Y - 8, pr.y),
+          125,
+          pr.damage,
+          '#84cc16',
+          true,
+          attackerId
+        );
+        world.projectiles.splice(i, 1);
+        continue;
+      }
+    }
 
     if (pr.life <= 0 || pr.x < -50 || pr.x > ARENA_W + 50 || pr.y > ARENA_H) {
       world.projectiles.splice(i, 1);
@@ -2147,14 +2486,18 @@ export function stepWorld(
   }
 }
 
-export function getHudSnapshot(world: SimulationWorld): HudSnapshot {
+export function getHudSnapshot(
+  world: SimulationWorld,
+  extras?: { isOnline?: boolean; localPlayerId?: 1 | 2 }
+): HudSnapshot {
   const [p1, p2] = world.players;
   const mapPlayer = (p: PlayerState) => {
     const def = CHARACTER_CLASSES[p.classId];
     return {
       id: p.id,
       classId: p.classId,
-      name: def.name,
+      name: p.customName ? p.customName : def.name,
+      className: def.name,
       enabled: p.enabled,
       isBot: p.isBot,
       hp: Math.ceil(p.hp),
@@ -2166,6 +2509,9 @@ export function getHudSnapshot(world: SimulationWorld): HudSnapshot {
           : 1,
       specialCooldownSec: Math.ceil(p.specialTimer),
       hasPickaxe: p.hasPickaxe,
+      credits: p.credits,
+      ownedWeapons: [...p.ownedWeapons],
+      equippedWeapon: p.equippedWeapon,
       downed: p.downed,
       dead: p.dead,
       shieldActive: p.shieldTimer > 0,
@@ -2180,6 +2526,8 @@ export function getHudSnapshot(world: SimulationWorld): HudSnapshot {
   return {
     mode: world.mode,
     playerCount: world.playerCount,
+    isOnline: extras?.isOnline ?? false,
+    localPlayerId: extras?.localPlayerId,
     wave: world.wave,
     enemiesRemaining: world.enemies.length + world.waveEnemiesToSpawn,
     teamScore: world.teamScore,
@@ -2188,6 +2536,7 @@ export function getHudSnapshot(world: SimulationWorld): HudSnapshot {
     nextWeather: world.weather.next,
     weatherTimerSec: Math.max(0, Math.ceil(world.weather.timer)),
     weatherWarning: world.weather.timer <= 12,
+    eventLog: world.eventLog.slice(-4),
     winnerId: world.winnerId,
     p1: mapPlayer(p1),
     p2: mapPlayer(p2),
